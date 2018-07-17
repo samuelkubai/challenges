@@ -1,3 +1,5 @@
+// Description Link: https://www.hackerrank.com/challenges/ctci-ice-cream-parlor/problem
+
 package main
 
 import (
@@ -7,143 +9,102 @@ import (
 	"strconv"
 	"strings"
 	"fmt"
+	"sort"
 )
 
+type flavor struct {
+	cost int32
+	id int32
+}
+
+type store struct{
+	flavors []*flavor
+}
+
+func (s *store) addFlavor(cost int32) {
+	s.flavors = append(s.flavors, &flavor{ id: int32(len(s.flavors) + 1), cost: cost})
+}
+
+func (s *store) getFlavor(index int32) *flavor {
+	return s.flavors[index]
+}
+
+// Implement the methods below to enable the store
+// struct to make use of the in-built sorting
+// libraries in go
+func (s *store) Len() int {
+	return len(s.flavors)
+}
+func (s *store) Swap(i, j int) {
+	s.flavors[i], s.flavors[j] = s.flavors[j], s.flavors[i]
+}
+func (s store) Less(i, j int) bool {
+	return s.flavors[i].cost < s.flavors[j].cost
+}
+// End of the sorting enabling methods.
+
+
 // Complete the whatFlavors function below.
-func whatFlavors(cost []int32, money int32) {
-	// Sort the costs in order to allow us to
-	// be able to search for the costs
-	sortedCosts, originalIndicies := mergeSort(cost, 0)
-	//fmt.Printf("Sorted costs are %v\n", sortedCosts)
-	//fmt.Printf("Sorted indicies are %v\n", originalIndicies)
+func whatFlavors(currentStore *store, money int32) {
+	// Sort
+	sort.Stable(currentStore)
 
-	// Chunk the costs slice in order to get
-	// a small slice to work on.
-	minimizedCosts := chunkCost(sortedCosts, money)
-	//fmt.Printf("Chunked cost slice is %v\n", minimizedCosts)
-
-	var lowerIndex, lowerCost, estimatedHigherCost int32 = 0, 0, 0
+	// Find pair
+	var lowerFlavor *flavor
+	var lowerIndex, possibleComplement int32 = 0, 0
 
 	for {
 		// If we don't find a match an thus
 		// is the end of the loop
-		if lowerIndex >= int32(len(minimizedCosts)) {
-			break
+		if lowerIndex >= int32(currentStore.Len()) {
+			fmt.Printf("No cost pair found")
+			return
 		}
 
-		lowerCost = minimizedCosts[lowerIndex]
-		estimatedHigherCost = money - lowerCost
+		lowerFlavor = currentStore.getFlavor(lowerIndex)
 
-		if higherIndex, valueFound := findCost(minimizedCosts, estimatedHigherCost, 0); valueFound {
-			resultLow := originalIndicies[lowerIndex] + 1
-			resultHigh := originalIndicies[higherIndex] + 1
+		possibleComplement = money - lowerFlavor.cost
 
-			if resultLow > resultHigh {
-				resultHigh = originalIndicies[lowerIndex] + 1
-				resultLow = originalIndicies[higherIndex] + 1
+		if matchedFlavor, valueFound := findCost(currentStore, possibleComplement, lowerIndex + 1); valueFound {
+			// Print the results
+			if lowerFlavor.id > matchedFlavor.id {
+				fmt.Printf("%d %d\n", matchedFlavor.id, lowerFlavor.id)
+			} else {
+				fmt.Printf("%d %d\n", lowerFlavor.id, matchedFlavor.id)
 			}
-
-			fmt.Printf("%d %d\n", resultLow, resultHigh)
 			return
 		}
 
 		lowerIndex++
 	}
-
-	fmt.Printf("No cost pair found")
-	return
 }
 
-func findCost(costs []int32, targetCost int32, startIndex int32) (int32, bool) {
-	if len(costs) < 2 {
-		if costs[0] == targetCost {
-			return startIndex, true
-		}
+func findCost(currentStore *store, targetCost int32, startPoint int32) (*flavor, bool) {
+	var searchIndex int32
 
-		return -1, false
-	}
+	max := int32(currentStore.Len() - 1)
+	min := startPoint
 
-	middle := int32(len(costs) / 2)
-
-	if costs[middle] == targetCost {
-		return startIndex + middle, true
-	}
-
-	if len(costs) < 2 {
-		return -1, false
-	}
-
-	if costs[middle] > targetCost {
-		return findCost(costs[:middle], targetCost, startIndex)
-	} else {
-		return findCost(costs[middle:], targetCost, middle)
-	}
-}
-
-func chunkCost(costs []int32, money int32) []int32 {
-	middle := int32(len(costs) / 2)
-
-	// Check if the money is initially larger
-	// than any single cost provided and
-	// just return the whole cost
-	// slice since any of the
-	// cost is a viable
-	// candidate.
-	if money >= costs[len(costs) - 1] {
-		return costs
-	}
-
-	if middle == money {
-		return costs[:money]
-	}
-
-	if middle > money {
-		return chunkCost(costs[:middle], money)
-	}
-
-	return costs
-}
-
-func mergeSort(slice []int32, originalIndex int32) ([]int32, []int32) {
-	if len(slice) < 2 {
-		return slice, []int32{originalIndex}
-	}
-
-	middle := int32(len(slice) / 2)
-	leftItems, leftIndicies := mergeSort(slice[:middle], originalIndex)
-	rightItems, rightIndicies := mergeSort(slice[middle:], originalIndex + middle)
-	return merge(leftItems, rightItems, leftIndicies, rightIndicies)
-}
-
-func merge(left []int32, right []int32, leftIndicies []int32, rightIndicies []int32) ([]int32, []int32)  {
-	var leftIndex, rightIndex int32 = 0, 0
-	var temp []int32
-	var tempIndicies []int32
 	for {
-		if leftIndex >= int32(len(left)) {
-			temp = append(temp, right[rightIndex:]...)
-			tempIndicies = append(tempIndicies, rightIndicies[rightIndex:]...)
+		if min > max {
 			break
 		}
 
-		if rightIndex >= int32(len(right)) {
-			temp = append(temp, left[leftIndex:]...)
-			tempIndicies = append(tempIndicies, leftIndicies[leftIndex:]...)
-			break
+		searchIndex = (min + max) / 2
+		selectedFlavor := currentStore.getFlavor(searchIndex)
+
+		if selectedFlavor.cost == targetCost {
+			return selectedFlavor, true
 		}
 
-		if left[leftIndex] <= right[rightIndex] {
-			temp = append(temp, left[leftIndex])
-			tempIndicies = append(tempIndicies, leftIndicies[leftIndex])
-			leftIndex++
+		if selectedFlavor.cost > targetCost {
+			max = searchIndex - 1
 		} else {
-			temp = append(temp, right[rightIndex])
-			tempIndicies = append(tempIndicies, rightIndicies[rightIndex])
-			rightIndex++
+			min = searchIndex + 1
 		}
 	}
 
-	return temp, tempIndicies
+	return &flavor{}, false
 }
 
 func main() {
@@ -164,16 +125,16 @@ func main() {
 
 		costTemp := strings.Split(readLine(reader), " ")
 
-		var cost []int32
+		var currentStore = &store{ flavors: make([]*flavor, 0) }
 
 		for i := 0; i < int(n); i++ {
 			costItemTemp, err := strconv.ParseInt(costTemp[i], 10, 64)
 			checkError(err)
 			costItem := int32(costItemTemp)
-			cost = append(cost, costItem)
+			currentStore.addFlavor(costItem)
 		}
 
-		whatFlavors(cost, money)
+		whatFlavors(currentStore, money)
 	}
 }
 
